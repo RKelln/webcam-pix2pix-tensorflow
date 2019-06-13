@@ -24,8 +24,12 @@ class Capturer(threading.Thread):
         print('Capturer.init with', device_id, capture_shape, capture_fps, output_shape)
         threading.Thread.__init__(self)
         
+        self.enabled = False
         self.sleep_s = sleep_s
         self.cvcap = cv2.VideoCapture(device_id)
+
+        # Known bug: https://github.com/opencv/opencv/pull/5474
+        #self.cvcap.set(cv2.CAP_PROP_AUTOFOCUS, False)
 
         if capture_shape != None:
             self.cvcap.set(cv2.CAP_PROP_FRAME_WIDTH, capture_shape[1])
@@ -38,20 +42,21 @@ class Capturer(threading.Thread):
             self.fps = self.cvcap.get(cv2.CAP_PROP_FPS)
             self.width = int(self.cvcap.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.height = int(self.cvcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.aspect_ratio = self.width * 1.0 / self.height
-            print('   Initialized at {}x{} at {}fps'.format(self.width, self.height, self.fps))
-        else:
-            self.enabled = False
+            if self.width > 0 and self.height > 0:
+                self.enabled = True
+            
+        if self.enabled == False:
             raise Exception('Could not initialise capture device')
             return
-
+        
+        self.aspect_ratio = self.width * 1.0 / self.height
+        print('   Initialized at {}x{} at {}fps'.format(self.width, self.height, self.fps))
 
         self.frame_stats = FrameStats('Capturer')
         
         self.output_shape = output_shape
         
         self.verbose = False
-        self.enabled = True
         self.thread_running = False
         
         self.freeze = False

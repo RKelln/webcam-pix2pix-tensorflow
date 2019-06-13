@@ -41,20 +41,21 @@ pyqt_params = gui.init_params(params.params_list, target_obj=params, w=320)
 gui.params_to_obj(pyqt_params, target_obj=params, create_missing=True, verbose=True)
 
 # create main window
-gui.init_window(x=320, w=(gui.screen_size().width()-320), h=(gui.screen_size().width()-320)*0.4)
-
-
-#%%
+if params.Main.liveshow:
+    size = 256
+    gui.init_liveshow(x=(gui.screen_size().width()/2-size/2), y=(gui.screen_size().height()/2-size/2), w=size, h=size)
+else:
+    gui.init_window(x=320, w=(gui.screen_size().width()-320), h=(gui.screen_size().width()-320)*0.4)
 
 # load predictor model
-predictor = Predictor(json_path = './models/gart_canny_256.json')
-
+model = params.Prediction.model
+predictor = Predictor(json_path = model)
 
 # init capture device
 def init_capture(capture, output_shape):
     if capture:
         capture.close()
-        
+
     capture_shape = (params.Capture.Init.height, params.Capture.Init.width)
     capture = Capturer(sleep_s = params.Capture.sleep_s,
                        device_id = params.Capture.Init.device_id,
@@ -62,31 +63,35 @@ def init_capture(capture, output_shape):
                        capture_fps = params.Capture.Init.fps,
                        output_shape = output_shape
                        )
-    
+
     capture.update()
-    
+
     if params.Capture.Init.use_thread:
         capture.start()
-    
+
     return capture
 
 
 capture = init_capture(capture, output_shape=predictor.input_shape)
 
-
 # keep track of frame count and frame rate
-frame_stats = FrameStats('Main')
-
+if not params.Main.liveshow:
+    frame_stats = FrameStats('Main')
 
 # main update loop
 while not params.Main.quit:
-    
+
+    if model != params.Prediction.model:
+        model = params.Prediction.model
+        predictor = Predictor(json_path = model)
+        print("loaded " + model)
+
     # reinit capture device if parameters have changed
     if params.Capture.Init.reinitialise:
         params.child('Capture').child('Init').child('reinitialise').setValue(False)
         capture = init_capture(capture, output_shape=predictor.input_shape)
-        
-        
+
+
     capture.enabled = params.Capture.enabled
     if params.Capture.enabled:
         # update capture parameters from GUI
@@ -96,11 +101,11 @@ while not params.Main.quit:
         capture.sleep_s = params.Capture.sleep_s
         for p in msa.utils.get_members(params.Capture.Processing):
             setattr(capture, p, getattr(params.Capture.Processing, p))
-        
+
         # run capture if multithreading is disabled
         if params.Capture.Init.use_thread == False:
             capture.update()
-            
+
         img_cap = np.copy(capture.img) # create copy to avoid thread issues
 
 
@@ -117,14 +122,17 @@ while not params.Main.quit:
     img_out = msa.utils.np_lerp(img_out, img_predicted, 1 - params.Prediction.post_time_lerp)
 
     # update frame states
-    frame_stats.verbose = params.Main.verbose
-    frame_stats.update()
-    
+    if not params.Main.liveshow:
+        frame_stats.verbose = params.Main.verbose
+        frame_stats.update()
+
     # update gui
-    gui.update_image(0, capture.img0)
-    gui.update_image(1, img_in)
-    gui.update_image(2, img_out)
-    gui.update_stats(frame_stats.str + "   |   " + capture.frame_stats.str)
+    i = 0
+    if not params.Main.liveshow:
+        gui.update_image(++i, capture.img0)
+        gui.update_image(++i, img_in)
+        gui.update_stats(frame_stats.str + "   |   " + capture.frame_stats.str)
+    gui.update_image(++i, img_out)
     gui.process_events()
 
     time.sleep(params.Main.sleep_s)
@@ -136,5 +144,3 @@ gui.close()
 
 capture = None
 predictor = None
-    
-print('Finished')

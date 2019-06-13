@@ -1,3 +1,7 @@
+*NOTE*: This is a fork of the original, with some very quick and ugly hacks applied to provide for a better expereince capturing the output into Hydra live coding editor. See [Coding Chaos Concert](https://github.com/RKelln/CodingChaosConcert) for more details.
+
+---------------------------------------------------
+
 This is the source code and pretrained model for the webcam pix2pix demo I posted recently on [twitter](https://twitter.com/memotv/status/858397873712623616) and vimeo. It uses deep learning, or to throw in a few buzzwords: *deep convolutional conditional generative adversarial network autoencoder*. 
 
 
@@ -52,6 +56,29 @@ I only made one infinitesimally tiny change to the tensorflow-pix2pix training c
 **You can download my pretrained model from the [Releases tab](https://github.com/memo/webcam-pix2pix-tensorflow/releases).**
 
 ![pix2pix_diff](https://cloud.githubusercontent.com/assets/144230/25583118/4e4f9794-2e88-11e7-8762-889e4113d0b8.png)
+
+RK: These changes look like this in text form:
+
+		@@ -326,6 +328,9 @@ def load_examples():
+		 def create_generator(generator_inputs, generator_outputs_channels):
+		     layers = []
+		 
+		+    # add name for compatibility with learn to see
+		+    generator_inputs = tf.identity(generator_inputs, name = "generator_inputs")
+		+
+		     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
+		     with tf.variable_scope("encoder_1"):
+		         output = gen_conv(generator_inputs, a.ngf)
+		         
+		@@ -388,6 +393,9 @@ def create_generator(generator_inputs, generator_outputs_channels):
+		         output = tf.tanh(output)
+		         layers.append(output)
+		 
+		+    # add name for compatibility with learn to see
+		+    layers.append(tf.identity(layers[-1], name = "generator_outputs"))
+		+
+		     return layers[-1]
+
 
 # 3. Preprocessing and prediction
 What this particular application does is load the pretrained model, do live preprocessing of a webcam input, and feed it to the model. I do the preprocessing with old fashioned basic computer vision, using opencv. It's really very minimal and basic. You can see the GUI below (the GUI uses [pyqtgraph](http://www.pyqtgraph.org/)).

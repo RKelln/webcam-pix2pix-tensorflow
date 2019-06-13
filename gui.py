@@ -11,8 +11,7 @@ from __future__ import print_function
 from __future__ import division
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
-
+from pyqtgraph.Qt import QtCore, QtGui
 
 #update = None
 
@@ -34,16 +33,16 @@ _windows = []
 
 def screen_size():
     return _app.desktop().screenGeometry()
-    
-    
+
+
 
 def init_app():
     global _app
     print('gui | Initializing QApplication')
     _app = QtGui.QApplication([])
 
-    
-    
+
+
 def process_events():
     if _app != None:
         _app.processEvents()
@@ -61,10 +60,10 @@ def params_to_obj(pyqt_params, target_obj, create_missing=False, verbose=False):
     '''copy values from pyqtgraph params to an object'''
     class DummyParamObj:
         pass
-    
+
     if verbose:
         print('params_to_obj {} to {}'.format(pyqt_params.name(), target_obj))
-        
+
     for p in pyqt_params.children():
         if len(p.children()) > 0:
             obj_has_member = p.name() in dir(target_obj)
@@ -74,18 +73,18 @@ def params_to_obj(pyqt_params, target_obj, create_missing=False, verbose=False):
 
                 setattr(target_obj, p.name(), DummyParamObj()) # quite a hack to create a dummy object
                 obj_has_member = True
-            
-                
+
+
             if obj_has_member:
                 params_to_obj(p, getattr(target_obj, p.name()), create_missing, verbose)
             elif verbose:
                 print('   skipping missing member', p.name())
-                
+
         else:
             if verbose:
                 print('   {}.{} = {}'.format(target_obj, p.name(), p.value()))
             setattr(target_obj, p.name(), p.value())
-        
+
 
 
 # TODO: only update what changed
@@ -103,8 +102,8 @@ def on_params_changed(param, changes):
 #        print('  change:    %s'% change)
 #        print('  data:      %s'% str(data))
 #        print('  ----------')
-    
-        
+
+
 
 def init_params(params_list, target_obj, x=0, y=0, w=320, h=1080, title='Tweak Me Control Freak'):
     global _ptree, _params, _params_target_obj, _windows
@@ -116,25 +115,28 @@ def init_params(params_list, target_obj, x=0, y=0, w=320, h=1080, title='Tweak M
     _ptree.setWindowTitle(title)
     _ptree.setGeometry(x, y, w, h)
     _ptree.show()
-    _params.sigTreeStateChanged.connect(on_params_changed) 
-    
+    _params.sigTreeStateChanged.connect(on_params_changed)
+
     _windows.append(_ptree)
     return _params
 
 
 
 def _add_image_to_layout(layout, row=None, col=None, rowspan=1, colspan=1, title=''):
-    i = pg.ImageItem(border='w')
+    #i = pg.ImageItem(border='w') # white border
+    i = pg.ImageItem()
     i.setOpts(axisOrder='row-major')
-    
+
     l = layout.addLayout()
-    l.addLabel(title)
-    l.nextRow()
+    if title != '':
+        l.addLabel(title)
+        l.nextRow()
 
     v = l.addViewBox(lockAspect=True, invertY=True, row=row, col=col, rowspan=rowspan, colspan=colspan)
     v.addItem(i)
+
     return {'img':i, 'view':v, 'layout':l}
-    
+
 
 
 def init_window(x=0, y=0, w=1440, h=1080, title='Hello World'):
@@ -145,24 +147,24 @@ def init_window(x=0, y=0, w=1440, h=1080, title='Hello World'):
     view.setWindowTitle(title)
     view.setGeometry(x, y, w, h)
     view.show()
-    
+
     imgs = []
     imgs.append( _add_image_to_layout(layout, title='capture') )
     imgs.append( _add_image_to_layout(layout, title='processed') )
     imgs.append( _add_image_to_layout(layout, title='prediction') )
-    
+
     layout.nextRow()
 
     stats_label = pg.LabelItem()
     layout.addItem(stats_label, colspan=3)
-    
+
     _window_view = view
     _window_layout = layout
     _window_imgs = imgs
     _window_stats_label = stats_label
-    
+
     _windows.append(view)
-    
+
 
 
 def update_image(index, img_data, enabled=True, autoLevels=False, levels=(0., 1.)):
@@ -170,13 +172,63 @@ def update_image(index, img_data, enabled=True, autoLevels=False, levels=(0., 1.
         _window_imgs[index]['img'].setImage(img_data, autoLevels=autoLevels, levels=levels)
     else:
         _window_imgs[index]['img'].clear()
-        
-        
-        
+
+
+
 def update_stats(text):
     _window_stats_label.setText(text)
 
-#    
+
+def clear_layout(layout):
+  while layout.count():
+    child = layout.takeAt(0)
+    if child.widget():
+      child.widget().deleteLater()
+
+
+def init_liveshow(x=0, y=0, w=320, h=320):
+    global _window_view, _window_layout, _window_imgs, _windows
+
+    # remove any existing
+    if _window_layout:
+        clear_layout(_window_layout)
+    if _window_view:
+        _window_view.close()
+        _windows.remove(_window_view)
+
+    view = pg.GraphicsView()
+    layout = pg.GraphicsLayout()
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)  # might not be necessary?
+
+    view.setCentralItem(layout)
+    view.setFrameShape(QtGui.QFrame.NoFrame)
+    view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+    view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+    view.setWindowTitle("Learn to See")
+    view.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.CustomizeWindowHint)
+    view.setGeometry(x, y, w, h)
+    view.show()
+
+    imgs = []
+    img = _add_image_to_layout(layout)
+    imgs.append( img )
+    print(img)
+
+    # remove borders
+    img['layout'].setContentsMargins(0, 0, 0, 0)
+    img['layout'].setSpacing(0)  # might not be necessary for you
+    img['view'].setAspectLocked(False)
+    img['view'].setRange(xRange=[0,w], yRange=[0,h], padding=0)
+
+    _window_view = view
+    _window_layout = layout
+    _window_imgs = imgs
+
+    _windows.append(view)
+
+
+#
 #def start(sleep_s):
 #    global _app, _update_timer
 #    print('gui.start')
@@ -185,11 +237,11 @@ def update_stats(text):
 #        _update_timer = QtCore.QTimer()
 #        _update_timer.timeout.connect(update)
 #        _update_timer.start(sleep_s * 1000)
-#    
+#
 #    print('gui | Starting QApplication')
 #    _app.exec_()
-#    
-#    
+#
+#
 
 def close():
     global _app, _update_timer, _windows
