@@ -1,6 +1,105 @@
-*NOTE*: This is a fork of the original, with some very quick and ugly hacks applied to provide for a better expereince capturing the output into Hydra live coding editor. See [Coding Chaos Concert](https://github.com/RKelln/CodingChaosConcert) for more details.
+# This is a fork
+
+This is a fork of the original, with some very quick and ugly hacks applied to provide for a better experience capturing the output into Hydra live coding editor. See [Coding Chaos Concert](https://github.com/RKelln/CodingChaosConcert) for more details.
+
+
+## Installation
+
+Rough CLI instructions for Ubuntu 18.04:
+
+### Install webcam-pix2pix-tensorflow
+
+#### Clone repo:
+
+    $ git clone https://github.com/RKelln/webcam-pix2pix-tensorflow.git
+    $ cd webcam-pix2pix-tensorflow
+    
+#### Download models: <a name="models"></a>
+Models are also available [here](https://drive.google.com/drive/folders/1B7qByPudT9WX3ZrbM00Rm1bNH6zI5AB8?usp=sharing).
+
+    $ wget https://github.com/RKelln/webcam-pix2pix-tensorflow/releases/download/sunrise/sunrise_canny_256.tar.gz
+    $ wget https://github.com/RKelln/webcam-pix2pix-tensorflow/releases/download/cathedral/cathedral_canny_256.tar.gz
+    $ wget https://github.com/RKelln/webcam-pix2pix-tensorflow/releases/download/trees/trees_canny_256.tar.gz
+    $ tar -xvzf sunrise_canny_256.tar.gz -C models/
+    $ tar -xvzf cathedral_canny_256.tar.gz -C models/
+    $ tar -xvzf trees_canny_256.tar.gz -C models/
+  
+#### Update conda:
+Note that PIL library used in the original has been changed to Pillow.
+
+    $ conda create -n learn_to_see python=3.5
+    $ conda activate learn_to_see
+    $ conda install pyqtgraph
+    $ pip install tensorflow
+    $ pip install opencv-python
+    $ pip install pillow
+
+#### Run:
+
+Remember to activate the conda environment firt if not already done:
+
+    $ activate learn_to_see
+
+Then:
+
+    $ python webcam-pix2pix.py
+
+
+### Training:
+
+Requires [training data](https://github.com/RKelln/CodingChaosConcert#training-data-L2S) and some training algorithm, like Memo I used pix2pix. Requires [conda with a tensorflow environment](https://github.com/RKelln/CodingChaosConcert/Ubuntu_ML_tips.md).
+
+#### Install pix2pix:
+
+    $ git clone https://github.com/affinelayer/pix2pix-tensorflow
+    $ cd pix2pix-tensorflow
+
+Edit `pix2pix.py`:
+```
+@@ -326,6 +328,9 @@ def load_examples():
+ def create_generator(generator_inputs, generator_outputs_channels):
+     layers = []
+
++    # add name for compatibility with learn to see
++    generator_inputs = tf.identity(generator_inputs, name = "generator_inputs")
++
+     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
+     with tf.variable_scope("encoder_1"):
+         output = gen_conv(generator_inputs, a.ngf)
+@@ -388,6 +393,9 @@ def create_generator(generator_inputs, generator_outputs_channels):
+         output = tf.tanh(output)
+         layers.append(output)
+
++    # add name for compatibility with learn to see
++    layers.append(tf.identity(layers[-1], name = "generator_outputs"))
++
+```
+
+#### Train a model:
+
+    $ cd webcam-pix2pix-tensorflow
+    $ conda activate magenta_gpu
+
+Edit `preprocess.py` script for folder location and dimensions.
+  
+    $ python preprocess.py
+    $ cd ../pix2pix-tensorflow
+    $ python pix2pix.py \
+      --mode train \
+      --output_dir /path/to/output \
+      --max_epochs 200 \
+      --input_dir /path/to/preprocessed/data/train \
+      --which_direction BtoA
+    $ cd ../webcam-pix2pix-tensorflow
+    $ mkdir /models/YOUR_NEW_MODEL
+    $ cp -R /path/to/output/* path/to/models/YOUR_NEW_MODEL/
+
+Copy one of the existing model json files (`models/sunrise_canny_256.json`) and edit to make your own.
+
+
 
 ---------------------------------------------------
+# The original README follows:
 
 This is the source code and pretrained model for the webcam pix2pix demo I posted recently on [twitter](https://twitter.com/memotv/status/858397873712623616) and vimeo. It uses deep learning, or to throw in a few buzzwords: *deep convolutional conditional generative adversarial network autoencoder*. 
 
@@ -18,7 +117,7 @@ This is the source code and pretrained model for the webcam pix2pix demo I poste
 # Overview
 The code in this particular repo actually has nothing to do with pix2pix, GANs or even deep learning. It just loads *any* pre-trained tensorflow model (as long as it complies with a few constraints), feeds it a processed webcam input, and displays the output of the model. It just so happens that the model I trained and used is pix2pix (details below). 
 
-I.e. The steps can be summarised as:
+I.E. The steps can be summarised as:
 
 1. Collect data: scrape the web for a ton of images, preprocess and prepare training data
 2. Train and export a model
@@ -59,25 +158,25 @@ I only made one infinitesimally tiny change to the tensorflow-pix2pix training c
 
 RK: These changes look like this in text form:
 
-		@@ -326,6 +328,9 @@ def load_examples():
-		 def create_generator(generator_inputs, generator_outputs_channels):
-		     layers = []
-		 
-		+    # add name for compatibility with learn to see
-		+    generator_inputs = tf.identity(generator_inputs, name = "generator_inputs")
-		+
-		     # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
-		     with tf.variable_scope("encoder_1"):
-		         output = gen_conv(generator_inputs, a.ngf)
-		         
-		@@ -388,6 +393,9 @@ def create_generator(generator_inputs, generator_outputs_channels):
-		         output = tf.tanh(output)
-		         layers.append(output)
-		 
-		+    # add name for compatibility with learn to see
-		+    layers.append(tf.identity(layers[-1], name = "generator_outputs"))
-		+
-		     return layers[-1]
+    @@ -326,6 +328,9 @@ def load_examples():
+     def create_generator(generator_inputs, generator_outputs_channels):
+         layers = []
+     
+    +    # add name for compatibility with learn to see
+    +    generator_inputs = tf.identity(generator_inputs, name = "generator_inputs")
+    +
+         # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
+         with tf.variable_scope("encoder_1"):
+             output = gen_conv(generator_inputs, a.ngf)
+             
+    @@ -388,6 +393,9 @@ def create_generator(generator_inputs, generator_outputs_channels):
+             output = tf.tanh(output)
+             layers.append(output)
+     
+    +    # add name for compatibility with learn to see
+    +    layers.append(tf.identity(layers[-1], name = "generator_outputs"))
+    +
+         return layers[-1]
 
 
 # 3. Preprocessing and prediction
@@ -108,20 +207,20 @@ Zero for any of the temporal blurs disables them. Values for these depend on you
 If you'd like to use a different model, you need to setup a JSON file similar to the one below. 
 The motivation here is that I actually have a bunch of JSONs in my app/models folder which I can dynamically scan and reload, and the model data is stored elsewhere on other disks, and the app can load and swap between models at runtime and scale inputs/outputs etc automatically. 
 
-	{
-		"name" : "gart_canny_256", # name of the model (for GUI)
-		"ckpt_path" : "./models/gart_canny_256", # path to saved model (meta + checkpoints). Loads latest if points to a folder, otherwise loads specific checkpoint
-		"input" : { # info for input tensor
-			"shape" : [256, 256, 3],  # expected shape (height, width, channels) EXCLUDING batch (assumes additional axis==0 will contain batch)
-			"range" : [-1.0, 1.0], # expected range of values 
-			"opname" : "generator/generator_inputs" # name of tensor (':0' is appended in code)
-		},
-		"output" : { # info for output tensor
-			"shape" : [256, 256, 3], # shape that is output (height, width, channels) EXCLUDING batch (assumes additional axis==0 will contain batch)
-			"range" : [-1.0, 1.0], # value range that is output
-			"opname" : "generator/generator_outputs" # name of tensor (':0' is appended in code)
-		}
-	}
+  {
+    "name" : "gart_canny_256", # name of the model (for GUI)
+    "ckpt_path" : "./models/gart_canny_256", # path to saved model (meta + checkpoints). Loads latest if points to a folder, otherwise loads specific checkpoint
+    "input" : { # info for input tensor
+      "shape" : [256, 256, 3],  # expected shape (height, width, channels) EXCLUDING batch (assumes additional axis==0 will contain batch)
+      "range" : [-1.0, 1.0], # expected range of values 
+      "opname" : "generator/generator_inputs" # name of tensor (':0' is appended in code)
+    },
+    "output" : { # info for output tensor
+      "shape" : [256, 256, 3], # shape that is output (height, width, channels) EXCLUDING batch (assumes additional axis==0 will contain batch)
+      "range" : [-1.0, 1.0], # value range that is output
+      "opname" : "generator/generator_outputs" # name of tensor (':0' is appended in code)
+    }
+  }
 
 
 # Requirements
@@ -137,8 +236,8 @@ I use the Anaconda python distribution which comes with almost everything you ne
 2. Install tensorflow https://www.tensorflow.org/install/ (Which - if you have anaconda - is often quite straight forward since most dependencies are included)
 3. Install opencv and pyqtgraph
 
-	conda install -c menpo opencv3
-	conda install pyqtgraph
+  conda install -c menpo opencv3
+  conda install pyqtgraph
     
     
     
